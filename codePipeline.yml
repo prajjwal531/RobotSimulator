@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CICD Pipeline '
+Parameters:
+  AppName:
+    Type: String
+    Description: Application name should be similar to repository name
+    Default: Sample-application
+  Branch:
+    Type: String
+    Description: Repository Branch Name
+    Default: develop
+  ContainerImageId:
+    Type: String
+    Description: Container image name for codebuild project
+    Default: aws/codebuild/standard:5.0
+
+Resources:
+  PipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+                - codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:UploadArchive
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:CancelUploadArchive
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStackResources
+                  - cloudformation:UpdateStack
+                Resource: "*"
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - codedeploy:*
+                  - kms:Encrypt
+                  - kms:Decrypt
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey*
+                  - kms:DescribeKey
+                  - sns:Publish
+                  - lambda:Invoke*
+                  - Lambda:*
+                  - apigateway:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - s3:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - iam:create*
+                  - iam:*
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+
+  s3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  CodeCommit:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref AppName
+  Sns:
+    Type: AWS::SNS::Topic
+
+  DevPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref s3Bucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: CodeCommitSourceAction
+              ActionTypeId:
+                Category: Source
+                Provider: CodeCommit
+                Owner: AWS
+                Version: '1'
+              OutputArtifacts:
+                - Name: Source
+              Configuration:
+                RepositoryName: !GetAtt CodeCommit.Name
+                BranchName: !Ref Branch
+              RunOrder: 1
+        - Name: Stage-Dev
+          Actions:
+            - Name: Approval
+              RunOrder: 1
+              ActionTypeId:
+                Category: Approval
+                Provider: Manual
+                Owner: AWS
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref Sns
+                CustomData: Please approve this change for pipeline
+            - Name: CodeBuildAction-DevDeployment
+              RunOrder: 2
+              InputArtifacts:
+                - Name: Source
+              ActionTypeId:
+                Category: Build
+                Provider: CodeBuild
+                Owner: AWS
+                Version: '1'
+              OutputArtifacts:
+                - Name: buildoutput
+              Configuration:
+                ProjectName:
+                  Ref: CloudformationBuildProject
+
+  CloudformationBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name:
+        Ref: AppName
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AppName
+            Value:
+              Ref: AppName
+            Type: PLAINTEXT
+          - Name: S3Bucket
+            Value: !Ref s3Bucket
+            Type: PLAINTEXT
+        Image:
+          Ref: ContainerImageId
+      ServiceRole: !GetAtt PipelineServiceRole.Arn

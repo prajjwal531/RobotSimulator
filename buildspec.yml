@@ -1,0 +1,28 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+      python: 3.8
+    commands:
+      - apt update
+      - pip install --upgrade awscli
+      - pip install boto3
+  pre_build:
+    commands:
+  build:
+    commands:
+      - echo "==== Runninng Unit Tests ===="
+      - python -m unittest tests/testsimulator.py
+      - echo "=== Finished running the unit tests ===="
+      - echo "=== deploying the sam application ====="
+      - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --stack-name $AppName --s3-bucket $S3Bucket  --capabilities CAPABILITY_IAM
+      - echo "==== Running Automation testing ===="
+      - cd testautomation && python automation.py $AppName
+      - aws s3 cp ../instruction.text s3://$S3Bucket/instruction.txt
+      - echo "Please test the robot by Clicking on the URL of API Gateway from the output of $AppName stack"
+
+
+artifacts:
+  files:
+    - '**/*'
