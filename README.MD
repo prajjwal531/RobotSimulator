@@ -9,10 +9,10 @@ Assumptions:
 
 Note: Currently Robot reads instructions from a text file, stored on S3 ( Assuming a streaming function will dump that file on S3)
 
-###robotSimulator:
+### robotSimulator:
 1. CommandParsor.py - This module is the starting point where all commands will be refined and made available to use.
 2. Robot.py        - This is the main brain of robot responsible for movement.
-###tests:
+### tests:
 1. testsimulator.py - unit tests are used to test the robot functionality
 ###testautomation:
 1. automation.py - this file is used to perform integration testing after robot is deployed on AWS. This module will use 
@@ -22,7 +22,7 @@ Template.yml - This is the SAM template that deploys the robot. As a result an A
 
 CodePipeline.yml - This template is used to deploy CodePipeline for CI/CD.
 
-###Usage:
+### Usage:
 
 Note: Please ensure aws cli is installed and AWS credentails are created and have required permissions to create these resources.
 
@@ -30,7 +30,7 @@ Unit Test:
 
 python -m unittest tests/testsimulator.py
 
-###Deploy From Local:
+### Deploy From Local:
 
 sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --stack-name <"StackName"> --s3-bucket <"Bucket for Sam to upload artifact">  --capabilities CAPABILITY_IAM
 
@@ -41,7 +41,7 @@ cd testautomation
 python automation.py <StackName>
 
 
-###CI/CD
+### Robot Simulator using CI/CD
 
 1. Deploy codePipeline.yml Cloudformation template. ( Please provide required input or lave them default)
 2. A codecommit repository has been created, push the whole source code in the repository.
