@@ -4,11 +4,11 @@ Parameters:
   AppName:
     Type: String
     Description: Application name should be similar to repository name
-    Default: Sample-application
+    Default: RobotSimulator
   Branch:
     Type: String
     Description: Repository Branch Name
-    Default: develop
+    Default: master
   ContainerImageId:
     Type: String
     Description: Container image name for codebuild project
